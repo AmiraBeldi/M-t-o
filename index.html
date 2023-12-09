@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Météo 24h</title>
+    <script src="https://kit.fontawesome.com/206ed7343d.js" crossorigin="anonymous"></script>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-image: url('Fond.jpeg');
+            background-size: cover; 
+            background-position: center; 
+          
+        }
+        h1 {
+            color: #d7d1dd;
+
+        }
+        #main-container {
+            width: 50%;
+        
+        }
+
+        #temps-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            margin-top: 20px;
+            background-color: #382879aa; 
+            border-radius: 20px; 
+            padding: 10px; 
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1); 
+        }
+
+        .hour {
+            width: calc(16.6667% - 20px); 
+            margin: 10px;
+            padding: 10px;
+            background-color: #fff; 
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            box-sizing: border-box;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1); 
+        }
+        #loading-indicator {
+        position: fixed;
+        top: 60%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+    }
+        #city-name {
+            position: absolute;
+            color: #d7d1dd;
+    top: 50%;
+    right: 30px; 
+    transform: translateY(-50%);
+   
+            
+}
+    
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        
+        <h1 id="phrase">Météo pour les 24 heures selon votre position</h1>
+        <h1 id="city-name"></h1>
+        <div id="temps-container"></div>
+    </div>
+    <div id="loading-indicator" style="display: none;">
+        <i class="fas fa-spinner fa-spin"></i> Chargement en cours...
+    </div>
+   
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const tempsContainer = document.getElementById('temps-container');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const cityNameElement = document.getElementById('city-name');
+
+function showLoadingIndicator() {
+    loadingIndicator.style.display = 'block';
+}
+
+function hideLoadingIndicator() {
+    loadingIndicator.style.display = 'none';
+}
+// Fonction pour obtenir le nom de la ville à partir des coordonnées
+function getCityName(latitude, longitude) {
+        return fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`)
+            .then(response => response.json())
+            .then(data => {
+                const cityName = data.address ? data.address.city || data.address.town || data.address.village || data.address.hamlet || 'Unknown' : 'Unknown';
+                return cityName;
+            })
+            .catch(error => {
+                console.error('Erreur lors de la récupération du nom de la ville', error);
+                return 'Unknown';
+            });
+    }
+            // Fonction pour obtenir la position actuelle
+            function getLocation() {
+                showLoadingIndicator();
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(meteo, Erreur);
+                } else {
+                    console.error("La géolocalisation n'est pas prise en charge par ce navigateur.");
+                    hideLoadingIndicator();
+                }
+            }
+
+            // Fonction pour afficher la méteo
+            function meteo(position) {
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
+                getCityName(latitude, longitude)
+            .then(cityName => {
+                cityNameElement.textContent = `        
+                 ${cityName} `;
+
+                // Utiliser les coordonnées pour récupérer les données météorologiques
+                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m&hourly=temperature_2m,wind_speed_10m&timezone=auto&forecast_days=1`)
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoadingIndicator();
+                        console.log(data);
+                        const hourlyData = data.hourly.temperature_2m;
+                        const heureactuelle = new Date().getHours();
+
+                        for (let i = 0; i < 24; i++) {
+                            const hour = i ;
+                            const temperature = hourlyData[i];
+                            const ventDescription = data.hourly.wind_speed_10m[i];
+
+                            // Creer un élément pour chaque heure
+                            const hourElement = document.createElement('div');
+                            hourElement.classList.add('hour');
+
+                            if (hour == heureactuelle) {
+                                hourElement.style.fontWeight = 'bold';
+                                hourElement.style.color = 'pink';
+                            }
+
+                            hourElement.innerHTML = `
+                                <p>${hour}:00</p>
+                                <p><i class="fa-solid fa-temperature-three-quarters" style="color: #2e4876;"></i>${Math.round(temperature)}°C</p>
+                                <p><i class="fa-solid fa-wind fa-xs" style="color: #2e4876;"></i>${ventDescription} km/h </p>
+                            `;
+
+                            // Ajouter l'élément qu'on vient de creer au conteneur
+                            tempsContainer.appendChild(hourElement);
+                        }
+                        hidePhrase();
+                    })
+                    .catch(error => console.error('Erreur lors de la récupération des données météorologiques', error));
+                    hideLoadingIndicator();
+                
+            });
+            }
+
+            // Fonction pour gérer les erreurs de géolocalisation
+            function Erreur(error) {
+                console.error('Erreur de géolocalisation:', error.message);
+                hideLoadingIndicator();
+            }
+
+            // Appeler la fonction pour obtenir la position actuelle et afficher la météo
+            getLocation();
+        });
+        function hidePhrase() {
+    const phraseElement = document.getElementById('phrase');
+    phraseElement.style.display = 'none';
+}
+    </script>
+</body>
+</html>
